@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Image Effects</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      background: #1a1a1a;
+      color: white;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    canvas {
+      max-width: 100%;
+      margin: 20px 0;
+      border: 2px solid #333;
+    }
+
+    .controls {
+      margin: 20px;
+      padding: 20px;
+      background: #333;
+      border-radius: 8px;
+      width: 80%;
+      max-width: 600px;
+    }
+
+    .slider-container {
+      margin: 10px 0;
+      display: flex;
+      align-items: center;
+    }
+
+    label {
+      display: inline-block;
+      width: 120px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+    }
+
+    .image-upload {
+      margin: 20px 0;
+      text-align: center;
+    }
+
+    .value-display {
+      width: 50px;
+      margin-left: 10px;
+      text-align: right;
+    }
+
+    .button-container {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      background: #4a4a4a;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #5a5a5a;
+    }
+
+    button.active {
+      background: #6a6a6a;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Image Effects</h1>
+  <div class="image-upload">
+    <input type="file" id="imageInput" accept="image/*">
+  </div>
+  <canvas id="canvas"></canvas>
+  <div class="button-container">
+    <button id="animateHue">Animate Hue</button>
+    <button id="saveImage">Save Image</button>
+  </div>
+  <div class="controls">
+    <h3>RGB Shift</h3>
+    <div class="slider-container">
+      <label for="rgbShift">Shift Amount:</label>
+      <input type="range" id="rgbShift" min="-50" max="50" value="10" />
+      <span id="rgbShiftValue" class="value-display">10</span>
+    </div>
+
+    <h3>HSV Adjustments</h3>
+    <div class="slider-container">
+      <label for="hue">Hue:</label>
+      <input type="range" id="hue" min="0" max="360" value="290" />
+      <span id="hueValue" class="value-display">290°</span>
+    </div>
+    <div class="slider-container">
+      <label for="saturation">Saturation:</label>
+      <input type="range" id="saturation" min="-100" max="100" value="0" />
+      <span id="saturationValue" class="value-display">0%</span>
+    </div>
+    <div class="slider-container">
+      <label for="value">Value:</label>
+      <input type="range" id="value" min="-100" max="100" value="0" />
+      <span id="valueValue" class="value-display">0%</span>
+    </div>
+  </div>
+
+  <script>
+    // Previous shader source code remains the same
+    const vsSource = `
+            attribute vec4 aVertexPosition;
+            attribute vec2 aTextureCoord;
+            varying vec2 vTextureCoord;
+
+            void main() {
+                gl_Position = aVertexPosition;
+                vTextureCoord = aTextureCoord;
+            }
+        `;
+
+    const fsSource = `
+            precision mediump float;
+            varying vec2 vTextureCoord;
+            uniform sampler2D uSampler;
+            uniform float uRGBShift;
+            uniform float uHue;
+            uniform float uSaturation;
+            uniform float uValue;
+
+            vec3 rgb2hsv(vec3 c) {
+                vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+                vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+                vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+                float d = q.x - min(q.w, q.y);
+                float e = 1.0e-10;
+                return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+            }
+
+            vec3 hsv2rgb(vec3 c) {
+                vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+                vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+                return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+            }
+
+            void main() {
+                float baseShift = uRGBShift;
+                vec2 rShift = vec2(baseShift, 0.0);
+                vec2 gShift = vec2(0.0, 0.0);
+                vec2 bShift = vec2(-baseShift, 0.0);
+
+                vec4 shiftedColor = vec4(
+                    texture2D(uSampler, vTextureCoord + rShift).r,
+                    texture2D(uSampler, vTextureCoord + gShift).g,
+                    texture2D(uSampler, vTextureCoord + bShift).b,
+                    1.0
+                );
+
+                vec3 hsv = rgb2hsv(shiftedColor.rgb);
+                hsv.x = mod(hsv.x + uHue, 1.0);
+                hsv.y = clamp(hsv.y * (1.0 + uSaturation), 0.0, 1.0);
+                hsv.z = clamp(hsv.z * (1.0 + uValue), 0.0, 1.0);
+
+                gl_FragColor = vec4(hsv2rgb(hsv), 1.0);
+            }
+        `;
+
+    // Previous WebGL setup code remains the same
+    function initShaderProgram(gl, vsSource, fsSource) {
+      const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+      const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+      const shaderProgram = gl.createProgram();
+      gl.attachShader(shaderProgram, vertexShader);
+      gl.attachShader(shaderProgram, fragmentShader);
+      gl.linkProgram(shaderProgram);
+
+      if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+        console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+        return null;
+      }
+
+      return shaderProgram;
+    }
+
+    // Previous helper functions remain the same
+    function loadShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+
+      return shader;
+    }
+
+    function initBuffers(gl) {
+      const positions = [
+        -1.0, 1.0,
+        1.0, 1.0,
+        -1.0, -1.0,
+        1.0, -1.0,
+      ];
+
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+      const textureCoords = [
+        0.0, 0.0,
+        1.0, 0.0,
+        0.0, 1.0,
+        1.0, 1.0,
+      ];
+
+      const textureCoordBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoords), gl.STATIC_DRAW);
+
+      return {
+        position: positionBuffer,
+        textureCoord: textureCoordBuffer,
+      };
+    }
+
+    function loadTexture(gl, image) {
+      const texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+      return texture;
+    }
+
+    const canvas = document.querySelector('#canvas');
+    const gl = canvas.getContext('webgl');
+
+    if (!gl) {
+      alert('Unable to initialize WebGL. Your browser may not support it.');
+    }
+
+    const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+    const programInfo = {
+      program: shaderProgram,
+      attribLocations: {
+        vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+        textureCoord: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
+      },
+      uniformLocations: {
+        uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
+        uRGBShift: gl.getUniformLocation(shaderProgram, 'uRGBShift'),
+        uHue: gl.getUniformLocation(shaderProgram, 'uHue'),
+        uSaturation: gl.getUniformLocation(shaderProgram, 'uSaturation'),
+        uValue: gl.getUniformLocation(shaderProgram, 'uValue'),
+      },
+    };
+
+    const buffers = initBuffers(gl);
+    let texture;
+    let animationId = null;
+
+    // Animation control
+    const animateHueBtn = document.getElementById('animateHue');
+    let isAnimating = false;
+
+    function toggleHueAnimation() {
+      if (isAnimating) {
+        cancelAnimationFrame(animationId);
+        animateHueBtn.classList.remove('active');
+      } else {
+        animateHueBtn.classList.add('active');
+        const hueSlider = document.getElementById('hue');
+        const animate = () => {
+          let currentHue = parseInt(hueSlider.value);
+          currentHue = (currentHue + 1) % 361;
+          hueSlider.value = currentHue;
+          draw();
+          animationId = requestAnimationFrame(animate);
+        };
+        animate();
+      }
+      isAnimating = !isAnimating;
+    }
+
+    // Save functionality
+    function saveImage() {
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.download = 'processed-image.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // Add event listeners for new buttons
+    document.getElementById('animateHue').addEventListener('click', toggleHueAnimation);
+    document.getElementById('saveImage').addEventListener('click', saveImage);
+
+    function draw() {
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+      gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoord);
+      gl.vertexAttribPointer(programInfo.attribLocations.textureCoord, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(programInfo.attribLocations.textureCoord);
+
+      gl.useProgram(programInfo.program);
+
+      const rgbShift = document.getElementById('rgbShift').value;
+      const hue = document.getElementById('hue').value;
+      const saturation = document.getElementById('saturation').value;
+      const value = document.getElementById('value').value;
+
+      // Update value displays
+      document.getElementById('rgbShiftValue').textContent = rgbShift;
+      document.getElementById('hueValue').textContent = hue + '°';
+      document.getElementById('saturationValue').textContent = saturation + '%';
+      document.getElementById('valueValue').textContent = value + '%';
+
+      gl.uniform1f(programInfo.uniformLocations.uRGBShift, rgbShift / canvas.width);
+      gl.uniform1f(programInfo.uniformLocations.uHue, hue / 360.0);
+      gl.uniform1f(programInfo.uniformLocations.uSaturation, saturation / 100.0);
+      gl.uniform1f(programInfo.uniformLocations.uValue, value / 100.0);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    // Load initial placeholder image
+    const defaultImage = new Image();
+    defaultImage.onload = function () {
+      canvas.width = defaultImage.width;
+      canvas.height = defaultImage.height;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      texture = loadTexture(gl, defaultImage);
+      draw();
+    };
+    defaultImage.src = '/api/placeholder/800/600';
+
+    document.getElementById('imageInput').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const image = new Image();
+          image.onload = function () {
+            // Stop any ongoing animation when loading new image
+            if (isAnimating) {
+              toggleHueAnimation();
+            }
+
+            canvas.width = image.width;
+            canvas.height = image.height;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            texture = loadTexture(gl, image);
+
+            // Reset HSV values to defaults
+            document.getElementById('hue').value = 290;
+            document.getElementById('saturation').value = 0;
+            document.getElementById('value').value = 0;
+
+            draw();
+          };
+          image.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Add event listeners for all controls
+    const controls = ['rgbShift', 'hue', 'saturation', 'value'];
+    controls.forEach(control => {
+      document.getElementById(control).addEventListener('input', draw);
+    });
+
+    // Handle page visibility changes
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && isAnimating) {
+        toggleHueAnimation(); // Stop animation when page is not visible
+      }
+    });
+
+    // Handle cleanup when leaving the page
+    window.addEventListener('beforeunload', () => {
+      if (isAnimating) {
+        cancelAnimationFrame(animationId);
+      }
+    });
+
+    // Set initial HSV values
+    document.getElementById('hue').value = 290;
+    document.getElementById('hueValue').textContent = '290°';
+  </script>
+</body>
+
+</html>
