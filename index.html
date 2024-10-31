@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Image Effects</title>
+  <title>Glitchy webgl</title>
   <style>
     body {
       margin: 0;
@@ -85,7 +85,7 @@
 </head>
 
 <body>
-  <h1>Image Effects</h1>
+  <h1>glitchly webgl</h1>
   <div class="image-upload">
     <input type="file" id="imageInput" accept="image/*">
   </div>
@@ -98,7 +98,7 @@
     <h3>RGB Shift</h3>
     <div class="slider-container">
       <label for="rgbShift">Shift Amount:</label>
-      <input type="range" id="rgbShift" min="-50" max="50" value="10" />
+      <input type="range" id="rgbShift" min="-100" max="100" value="20" />
       <span id="rgbShiftValue" class="value-display">10</span>
     </div>
 
@@ -121,7 +121,6 @@
   </div>
 
   <script>
-    // Previous shader source code remains the same
     const vsSource = `
             attribute vec4 aVertexPosition;
             attribute vec2 aTextureCoord;
@@ -180,7 +179,6 @@
             }
         `;
 
-    // Previous WebGL setup code remains the same
     function initShaderProgram(gl, vsSource, fsSource) {
       const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
       const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
@@ -198,7 +196,6 @@
       return shaderProgram;
     }
 
-    // Previous helper functions remain the same
     function loadShader(gl, type, source) {
       const shader = gl.createShader(type);
       gl.shaderSource(shader, source);
@@ -283,7 +280,6 @@
     let texture;
     let animationId = null;
 
-    // Animation control
     const animateHueBtn = document.getElementById('animateHue');
     let isAnimating = false;
 
@@ -306,16 +302,13 @@
       isAnimating = !isAnimating;
     }
 
-    // Save functionality
     function saveImage() {
-      // Create a temporary link element
       const link = document.createElement('a');
       link.download = 'processed-image.png';
       link.href = canvas.toDataURL('image/png');
       link.click();
     }
 
-    // Add event listeners for new buttons
     document.getElementById('animateHue').addEventListener('click', toggleHueAnimation);
     document.getElementById('saveImage').addEventListener('click', saveImage);
 
@@ -338,7 +331,6 @@
       const saturation = document.getElementById('saturation').value;
       const value = document.getElementById('value').value;
 
-      // Update value displays
       document.getElementById('rgbShiftValue').textContent = rgbShift;
       document.getElementById('hueValue').textContent = hue + '°';
       document.getElementById('saturationValue').textContent = saturation + '%';
@@ -356,7 +348,6 @@
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
 
-    // Load initial placeholder image
     const defaultImage = new Image();
     defaultImage.onload = function () {
       canvas.width = defaultImage.width;
@@ -374,7 +365,6 @@
         reader.onload = function (e) {
           const image = new Image();
           image.onload = function () {
-            // Stop any ongoing animation when loading new image
             if (isAnimating) {
               toggleHueAnimation();
             }
@@ -384,7 +374,6 @@
             gl.viewport(0, 0, canvas.width, canvas.height);
             texture = loadTexture(gl, image);
 
-            // Reset HSV values to defaults
             document.getElementById('hue').value = 290;
             document.getElementById('saturation').value = 0;
             document.getElementById('value').value = 0;
@@ -397,27 +386,23 @@
       }
     });
 
-    // Add event listeners for all controls
     const controls = ['rgbShift', 'hue', 'saturation', 'value'];
     controls.forEach(control => {
       document.getElementById(control).addEventListener('input', draw);
     });
 
-    // Handle page visibility changes
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && isAnimating) {
-        toggleHueAnimation(); // Stop animation when page is not visible
+        toggleHueAnimation();
       }
     });
 
-    // Handle cleanup when leaving the page
     window.addEventListener('beforeunload', () => {
       if (isAnimating) {
         cancelAnimationFrame(animationId);
       }
     });
 
-    // Set initial HSV values
     document.getElementById('hue').value = 290;
     document.getElementById('hueValue').textContent = '290°';
   </script>
