@@ -95,6 +95,7 @@
     <canvas id="canvas"></canvas>
     <div class="button-container">
       <button id="animateHue">Animate Hue</button>
+      <button id="downloadImage">Download Image</button>
     </div>
     <div class="controls">
       <div class="control-group">
@@ -269,7 +270,7 @@
         `;
 
       const canvas = document.querySelector("#canvas");
-      const gl = canvas.getContext("webgl");
+      const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
 
       if (!gl) {
         alert("Unable to initialize WebGL. Your browser may not support it.");
@@ -543,6 +544,21 @@
           cancelAnimationFrame(animationId);
         }
       });
+
+      document
+        .getElementById("downloadImage")
+        .addEventListener("click", function () {
+          const link = document.createElement("a");
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+          link.download = `glitch-${timestamp}.png`;
+
+          const canvas = document.querySelector("#canvas");
+          link.href = canvas.toDataURL("image/png");
+
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
     </script>
   </body>
 </html>
